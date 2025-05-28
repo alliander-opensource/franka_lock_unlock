@@ -19,7 +19,9 @@ from time import sleep
 from itertools import count
 import atexit
 from threading import Event
+from rclpy import logging
 
+LOGGER = logging.get_logger("Franka_lock_unlock")
 
 class FrankaLockUnlock:
     def __init__(
@@ -43,14 +45,14 @@ class FrankaLockUnlock:
         atexit.register(self._cleanup)
 
     def _cleanup(self):
-        print("Cleaning up...")
+        LOGGER.info("Cleaning up...")
         if self._relock:
             self.run(unlock=False)
         if self._token is not None or self._token_id is not None:
             self._release_token()
         if self._logged_in:
             self._logout()
-        print("Successfully cleaned up.")
+        LOGGER.info("Successfully cleaned up.")
 
     @staticmethod
     def _encode_password(username, password):
@@ -65,9 +67,9 @@ class FrankaLockUnlock:
         return base64.encodebytes(bs.encode("utf-8")).decode("utf-8")
 
     def _login(self):
-        print("Logging in...")
+        LOGGER.info("Logging in...")
         if self._logged_in:
-            print("Already logged in.")
+            LOGGER.info("Already logged in.")
             return
         login = self._session.post(
             urljoin(self._hostname, "/admin/api/login"),
@@ -79,16 +81,16 @@ class FrankaLockUnlock:
         assert login.status_code == 200, "Error logging in."
         self._session.cookies.set("authorization", login.text)
         self._logged_in = True
-        print("Successfully logged in.")
+        LOGGER.info("Successfully logged in.")
 
     def _logout(self):
-        print("Logging out...")
+        LOGGER.info("Logging out...")
         assert self._logged_in
         logout = self._session.post(urljoin(self._hostname, "/admin/api/logout"))
         assert logout.status_code == 200, "Error logging out"
         self._session.cookies.clear()
         self._logged_in = False
-        print("Successfully logged out.")
+        LOGGER.info("Successfully logged out.")
 
     def _get_active_token_id(self):
         token_query = self._session.get(
@@ -103,10 +105,10 @@ class FrankaLockUnlock:
         return active_token_id is None or active_token_id == self._token_id
 
     def _request_token(self, physically=False):
-        print("Requesting a control token...")
+        LOGGER.info("Requesting a control token...")
         if self._token is not None:
             assert self._token_id is not None
-            print("Already having a control token.")
+            LOGGER.info("Already having a control token.")
             return
         token_request = self._session.post(
             urljoin(
@@ -119,10 +121,10 @@ class FrankaLockUnlock:
         json = token_request.json()
         self._token = json["token"]
         self._token_id = json["id"]
-        print(f"Received control token is {self._token} with id {self._token_id}.")
+        LOGGER.info(f"Received control token is {self._token} with id {self._token_id}.")
 
     def _release_token(self):
-        print("Releasing control token...")
+        LOGGER.info("Releasing control token...")
         token_delete = self._session.delete(
             urljoin(self._hostname, "/admin/api/control-token"),
             json={"token": self._token},
@@ -130,33 +132,33 @@ class FrankaLockUnlock:
         assert token_delete.status_code == 200, "Error releasing control token."
         self._token = None
         self._token_id = None
-        print("Successfully released control token.")
+        LOGGER.info("Successfully released control token.")
 
     def _activate_fci(self):
-        print("Activating FCI...")
+        LOGGER.info("Activating FCI...")
         fci_request = self._session.post(
             urljoin(self._hostname, f"/admin/api/control-token/fci"),
             json={"token": self._token},
         )
         assert fci_request.status_code == 200, "Error activating FCI."
-        print("Successfully activated FCI.")
+        LOGGER.info("Successfully activated FCI.")
 
     def _home_gripper(self):
-        print("Homing the gripper...")
+        LOGGER.info("Homing the gripper...")
         action = self._session.post(
             urljoin(self._hostname, f"/desk/api/gripper/homing"),
             headers={"X-Control-Token": self._token},
         )
         assert action.status_code == 200, "Error homing gripper."
-        print(f"Successfully homed the gripper.")
+        LOGGER.info(f"Successfully homed the gripper.")
 
     def _lock_unlock(self, unlock: bool, force: bool = False):
-        print(f'{"Unlocking" if unlock else "Locking"} the robot...')
+        LOGGER.info(f'{"Unlocking" if unlock else "Locking"} the robot...')
         action = self._session.post(urljoin(self._hostname, f'/desk/api/joints/{"unlock" if unlock else "lock"}'), \
                                                                 files={'force': force},
                                                                 headers={'X-Control-Token': self._token})
         assert action.status_code == 200, "Error requesting brake open/close action."
-        print(f'Successfully {"unlocked" if unlock else "locked"} the robot.')
+        LOGGER.info(f'Successfully {"unlocked" if unlock else "locked"} the robot.')
 
     def run(
         self,
@@ -189,7 +191,7 @@ class FrankaLockUnlock:
                     # Consider the timeout of 30 s for requesting physical access to the robot
                     for _ in range(20) if request else count():
                         if (not wait and not request) or self._is_active_token():
-                            print("Successfully acquired control over the robot.")
+                            LOGGER.info("Successfully acquired control over the robot.")
                             self._lock_unlock(unlock=unlock)
                             if home:
                                 self._home_gripper()
@@ -197,11 +199,11 @@ class FrankaLockUnlock:
                                 self._activate_fci()
                             return
                         if request:
-                            print(
+                            LOGGER.info(
                                 "Please press the button with the (blue) circle on the robot to confirm physical access."
                             )
                         elif wait:
-                            print(
+                            LOGGER.info(
                                 "Please confirm the request message in the web interface on the logged in user."
                             )
                         sleep(1)
@@ -280,5 +282,5 @@ if __name__ == "__main__":
     )
 
     if args.persistent:
-        print("Keeping persistent connection...")
+        LOGGER.info("Keeping persistent connection...")
         Event().wait()
