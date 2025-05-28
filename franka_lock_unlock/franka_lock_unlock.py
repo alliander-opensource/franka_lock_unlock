@@ -21,7 +21,7 @@ import atexit
 from threading import Event
 from rclpy import logging
 
-LOGGER = logging.get_logger("Franka_lock_unlock")
+LOGGER = logging.get_logger("Franka_lock_unlock_node")
 
 class FrankaLockUnlock:
     def __init__(
