@@ -18,7 +18,6 @@ setup(
     maintainer_email="ethz@juliankeller.net",
     description="Lock or unlock the Franka Emika Panda joint brakes programmatically.",
     license="AGPLv3",
-    tests_require=["pytest"],
     scripts=[
         "franka_lock_unlock/franka_lock_unlock.py",
     ],
