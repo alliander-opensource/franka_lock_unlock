@@ -12,7 +12,6 @@ setup(
         ("share/" + package_name, ["package.xml"]),
         ("share/" + package_name + "/launch", glob("launch/*launch.[pxy][yma]*")),
     ],
-    install_requires=["setuptools"],
     zip_safe=True,
     maintainer="jk-ethz",
     maintainer_email="ethz@juliankeller.net",
